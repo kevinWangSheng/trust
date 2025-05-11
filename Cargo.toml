@@ -1,0 +1,11 @@
+[package]
+name = "trust"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.98"
+bitflags = "1.0"
+etherparse = { version = "0.18.0" ,features = ["std"]}
+nix = "0.13"
+tun-tap = "0.1.4"
