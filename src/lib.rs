@@ -1,15 +1,62 @@
 use std::{
-    collections::{HashMap, VecDeque},
-    io::{self, Read, Write},
-    net::Ipv4Addr,
-    sync::{Arc, Condvar, Mutex},
-    thread,
+    collections::{HashMap, VecDeque}, io::{self, Read, Write}, net::Ipv4Addr, os::linux::raw::stat, process::ExitStatus, sync::{Arc, Condvar, Mutex}, thread
 };
 
 
 mod tcp;
 
 const SENDQUEUE_SIZE: usize = 1024;
+
+/// set the command to run 
+pub fn run_command(cmd:&str,args:&[&str])->io::Result<ExitStatus>{
+    use std::process::Command;
+    let mut command = Command::new(cmd);
+    command.args(args);
+    let status = command.status()?;
+    if !status.success() {
+        let err_msg = format!(
+            "Command `{} {}` failed with status: {}",
+            cmd,
+            args.join(" "),
+            status
+        );
+        
+        // 创建一个保留原始退出码的自定义错误
+        let mut err = io::Error::new(
+            io::ErrorKind::Other,
+            err_msg,
+        );
+        
+        // 如果有退出码，将其设置为原始错误码
+        if let Some(code) = status.code() {
+            // 在Windows上raw_os_error()和ExitStatus.code()是不同的，
+            // 但在Unix系统上我们可以将exit code作为os_error
+            #[cfg(unix)]
+            {
+                use std::os::unix::process::ExitStatusExt;
+                if let Some(signal) = status.signal() {
+                    // 如果进程被信号终止，使用信号值作为错误码的高位
+                    let combined_code = (signal << 8) | 0xFF;
+                    err = io::Error::from_raw_os_error(combined_code);
+                } else {
+                    // 否则使用exit code作为错误码
+                    err = io::Error::from_raw_os_error(code);
+                }
+            }
+            
+            #[cfg(windows)]
+            {
+                // Windows下简单地使用exit code
+                err = io::Error::from_raw_os_error(code);
+            }
+        }
+        
+        return Err(err);
+    }
+    
+    Ok(status)
+
+}
 
 // define a struct to hold the source and destination IP addresses and the port number
 // this data was store in a hashmap
