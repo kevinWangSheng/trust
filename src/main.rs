@@ -1,9 +1,5 @@
-use std::{
-    io::{self, Read, Write},
-    thread,
-};
+use std::{io::{self, Read, Write}, thread};
 
-use anyhow::Ok;
 use trust::run_command;
 
 mod tcp;
@@ -21,7 +17,7 @@ fn main() -> anyhow::Result<()> {
 
     // create a interface
     let mut interface = match trust::Interface::new() {
-        io::Result::Ok(interface) => interface,
+        Ok(interface) => interface,
         Err(e) => {
             eprintln!("Failed to create interface: {}", e);
             return Err(e.into());
@@ -42,7 +38,7 @@ fn main() -> anyhow::Result<()> {
                 vitural_ip,
             ],
         ) {
-            io::Result::Ok(_) => {
+            Ok(_) => {
                 eprintln!("Route added successfully");
             }
             Err(e) => {
@@ -51,7 +47,7 @@ fn main() -> anyhow::Result<()> {
                 } else {
                     false
                 };
-                if is_file_exist_error{
+                if is_file_exist_error {
                     eprintln!("you are already add the route, do not add it again");
                 } else {
                     eprintln!("Failed to add route: {}", e);
@@ -87,21 +83,47 @@ fn main() -> anyhow::Result<()> {
     // bind the listener
     let mut listener = interface.bind(443)?;
     eprintln!("Listening on port 443...");
-    while let io::Result::Ok(mut stream) = listener.accept() {
+    
+    while let Ok(mut stream) = listener.accept() {
+        match stream.perr_addr() {
+            Ok(addr) => {
+                eprintln!("Accepted connection from {:?}", addr);
+            }
+            Err(e) => {
+                eprintln!("Failed to get peer address: {}", e);
+                continue;
+            }
+            
+        }
         eprintln!("got connection!");
-        stream.write(b"I send the repsonse to you!!\n").unwrap();
-        stream.shutdown(std::net::Shutdown::Write).unwrap();
+        if let Err(e) = stream.write_all(b"I send the repsonse to you!!\n"){
+            eprintln!("Failed to write to stream: {}", e);
+            continue;
+        }
+        // stream.shutdown(std::net::Shutdown::Write).unwrap();
         thread::spawn(move || {
             // stream.shutdown(std::net::Shutdown::Write).unwrap();
             loop {
                 let mut buf = [0; 512];
-                let n = stream.read(&mut buf[..]).unwrap();
-                eprintln!("read {}b of data", n);
-                if n == 0 {
-                    eprintln!("no more data!");
-                    break;
-                } else {
-                    println!("{}", std::str::from_utf8(&buf[..n]).unwrap());
+                match stream.read(&mut buf[..]) {
+                    Ok(n) => {
+                        if n == 0 {
+                            eprintln!("no more data!");
+                        } else {
+                            match std::str::from_utf8(&buf[..n]) {
+                                Ok(s) => {
+                                    eprintln!("read {}b of data: {}", n, s);
+                                }
+                                Err(e) => {
+                                    eprintln!("Failed to convert bytes to string: {}", e);
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("c to read from stream: {}", e);
+                        break;
+                    }
                 }
             }
         });

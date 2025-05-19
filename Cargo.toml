@@ -8,4 +8,5 @@ anyhow = "1.0.98"
 bitflags = "1.0"
 etherparse = { version = "0.18.0" ,features = ["std"]}
 nix = "0.13"
+rand = "0.9.1"
 tun-tap = "0.1.4"

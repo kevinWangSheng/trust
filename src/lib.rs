@@ -2,6 +2,9 @@ use std::{
     collections::{HashMap, VecDeque}, io::{self, Read, Write}, net::Ipv4Addr, os::linux::raw::stat, process::ExitStatus, sync::{Arc, Condvar, Mutex}, thread
 };
 
+use etherparse::TcpHeader;
+use tun_tap::Iface;
+
 
 mod tcp;
 
@@ -370,7 +373,7 @@ impl Write for TcpStream {
 impl TcpStream{
     // closed function
 
-    pub fn shutdown(&self,how:std::net::Shutdown)->io::Result<()>{
+    pub fn shutdown(&self, how: std::net::Shutdown, nic: &mut Iface, tcph: &TcpHeader) -> io::Result<()> {
         let mut cm = self.h.manager.lock().unwrap();
 
         let c = cm.connections.get_mut(&self.quad).ok_or_else(|| {
@@ -379,7 +382,11 @@ impl TcpStream{
                 "stream was terminated unexpectedly",
             )
         })?;
-        // finaly colse the connection 
-        c.close()
+        // finally close the connection 
+        c.close(nic, tcph)
+    }
+
+    pub fn perr_addr(&self)->io::Result<(Ipv4Addr,u16)>{
+        io::Result::Ok(self.quad.dst)
     }
 }
