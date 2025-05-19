@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, VecDeque}, io::{self, Read, Write}, net::Ipv4Addr, os::linux::raw::stat, process::ExitStatus, sync::{Arc, Condvar, Mutex}, thread
+    collections::{HashMap, VecDeque}, io::{self, Read, Write}, net::Ipv4Addr, process::ExitStatus, sync::{Arc, Condvar, Mutex}, thread
 };
 
 use etherparse::TcpHeader;
@@ -370,6 +370,7 @@ impl Write for TcpStream {
     }
 }
 
+#[allow(unused)]
 impl TcpStream{
     // closed function
 

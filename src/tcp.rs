@@ -41,7 +41,7 @@ pub struct Connection {
     closed_at: Option<u32>,
     max_incoming_buffer_size: usize, // the remian incoming buffer size
     send_window_update_ack: bool,
-    time_wait_entry_time: Option<time::Instant>, 
+    time_wait_entry_time: Option<time::Instant>,
 }
 
 struct Timers {
@@ -130,6 +130,8 @@ struct RecvSequenceSpace {
     irs: u32,
 }
 
+#[allow(dead_code)]
+#[allow(unused_variables)]
 impl Connection {
     pub(crate) fn is_ready_for_removal(&self) -> bool {
         // A connection is ready for removal if its state is Closed.
@@ -317,8 +319,11 @@ impl Connection {
             if let Some(entry_time) = self.time_wait_entry_time {
                 const TIME_WAIT_DURATION: time::Duration = time::Duration::from_secs(30); // 2*MSL, typically 1-4 mins. Using 30s for quicker testing.
                 if entry_time.elapsed() >= TIME_WAIT_DURATION {
-                    eprintln!("[{}:{}] TIME_WAIT expired. Transitioning to Closed.",
-                              std::net::Ipv4Addr::from(self.ip.destination), self.tcp.destination_port);
+                    eprintln!(
+                        "[{}:{}] TIME_WAIT expired. Transitioning to Closed.",
+                        std::net::Ipv4Addr::from(self.ip.destination),
+                        self.tcp.destination_port
+                    );
                     self.state = State::Closed; // Now it's truly closed
                     self.closed = true; // Redundant if State::Closed implies this, but good for clarity
                 }
@@ -327,8 +332,9 @@ impl Connection {
             // on_packet will handle sending ACKs if a FIN is received during TIME_WAIT.
             return Ok(());
         }
-    
-        if let State::Closed = self.state { // If already marked closed (e.g. by RST), do nothing.
+
+        if let State::Closed = self.state {
+            // If already marked closed (e.g. by RST), do nothing.
             return Ok(());
         }
         if let State::FinWait2 | State::TimeWait = self.state {
@@ -796,21 +802,27 @@ impl Connection {
         io::Result::Ok(())
     }
     pub(crate) fn initiate_active_close(&mut self) {
-        eprintln!("[{}:{}] Application requesting to close connection (active close). Current state: {:?}",
-            std::net::Ipv4Addr::from(self.ip.destination), self.tcp.destination_port, self.state);
-    
+        eprintln!(
+            "[{}:{}] Application requesting to close connection (active close). Current state: {:?}",
+            std::net::Ipv4Addr::from(self.ip.destination),
+            self.tcp.destination_port,
+            self.state
+        );
+
         match self.state {
             State::Estab => {
                 self.state = State::FinWait1;
                 self.closed = true; // Mark our end as closed for sending
                 // The FIN will be sent by on_tick or next data write
             }
-            State::CloseWait => { // Received FIN from peer, now app closes
+            State::CloseWait => {
+                // Received FIN from peer, now app closes
                 self.state = State::LastAck;
                 self.closed = true; // Mark our end as closed for sending
                 // The FIN will be sent by on_tick or next data write
             }
-            State::SynRcvd => { // App closes before connection fully established
+            State::SynRcvd => {
+                // App closes before connection fully established
                 // This is a bit tricky. Sending FIN is one option. Sending RST might be more appropriate for abort.
                 // For simplicity, let's try to send a FIN.
                 self.state = State::FinWait1; // Or directly to Closed and send RST
@@ -818,24 +830,36 @@ impl Connection {
             }
             // If already in a closing state (FinWait1, FinWait2, Closing, LastAck, TimeWait) or Closed, do nothing.
             _ => {
-                eprintln!("[{}:{}] Shutdown called on connection in state {:?}, no action.",
-                    std::net::Ipv4Addr::from(self.ip.destination), self.tcp.destination_port, self.state);
+                eprintln!(
+                    "[{}:{}] Shutdown called on connection in state {:?}, no action.",
+                    std::net::Ipv4Addr::from(self.ip.destination),
+                    self.tcp.destination_port,
+                    self.state
+                );
             }
         }
     }
 
     /// Call this when a connection enters TIME_WAIT state.
     pub(crate) fn enter_time_wait(&mut self) {
-        eprintln!("[{}:{}] Connection entering TIME_WAIT.",
-            std::net::Ipv4Addr::from(self.ip.destination), self.tcp.destination_port);
+        eprintln!(
+            "[{}:{}] Connection entering TIME_WAIT.",
+            std::net::Ipv4Addr::from(self.ip.destination),
+            self.tcp.destination_port
+        );
         self.state = State::TimeWait;
         self.time_wait_entry_time = Some(time::Instant::now());
     }
 
     /// Call this when an RST is received or a fatal error occurs.
     pub(crate) fn enter_closed_due_to_rst_or_error(&mut self, reason: &str) {
-         eprintln!("[{}:{}] Connection moving to Closed. Reason: {}. Current state: {:?}",
-            std::net::Ipv4Addr::from(self.ip.destination), self.tcp.destination_port, reason, self.state);
+        eprintln!(
+            "[{}:{}] Connection moving to Closed. Reason: {}. Current state: {:?}",
+            std::net::Ipv4Addr::from(self.ip.destination),
+            self.tcp.destination_port,
+            reason,
+            self.state
+        );
         self.state = State::Closed;
         self.closed = true; // Ensure application layer sees it as closed too
         // Any other cleanup specific to the Connection struct if needed
@@ -849,5 +873,3 @@ fn wrapping_lt(lhs: u32, rhs: u32) -> bool {
 fn is_between_wrapped(start: u32, x: u32, end: u32) -> bool {
     wrapping_lt(start, x) && wrapping_lt(x, end)
 }
-
-
